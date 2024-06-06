@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom, thread_rng};
-use std::fs::File;
-use std::io::{self, BufRead, Read, Write, BufWriter};
+use std::fs::{self, File};
+use std::io::{self, BufRead, Write, BufWriter};
 
 struct GraphFile {
     lines: Vec<String>,
@@ -14,7 +14,7 @@ impl GraphFile {
         let mut m: usize = 0;
         let mut lines: Vec<String> = vec![];
 
-        let mut first = false;
+        let mut first = 0;
         for line in reader.lines() {
             let line = line?;
             let elements: Vec<_> = line.split(' ').collect();
@@ -22,7 +22,7 @@ impl GraphFile {
             match elements[0] {
                 "c" => {}
                 _ => {
-                    if !first {
+                    if first == 0 {
                         match elements[0].parse::<usize>() {
                             Ok(val) => {
                                 n = val;
@@ -34,7 +34,9 @@ impl GraphFile {
                                 ))
                             }
                         }
-                        match elements[1].parse::<usize>() {
+                        first += 1;
+                    } else if  first == 1 {
+                        match elements[0].parse::<usize>() {
                             Ok(val) => {
                                 m = val;
                             }
@@ -45,7 +47,7 @@ impl GraphFile {
                                 ))
                             }
                         }
-                        first = true;
+                        first += 1;
                     } else {
                         lines.push(line);
                     }
@@ -78,25 +80,44 @@ fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = std::env::args().collect();
 
     // Check if enough arguments are provided
-    if args.len() < 4 {
-        eprintln!("Usage: {} <input_file> <output_file> <k>", args[0]);
+    /*if args.len() < 3 {
+        eprintln!("Usage: {} <input_file> <output_file>", args[0]);
         return Ok(());
-    }
+    }*/
 
     // Parse command line arguments
-    let input_file = &args[1];
-    let output_file = &args[2];
-    let k: usize = args[3].parse().expect("k must be a valid usize");
+    //let input_file = &args[1];
+    //let output_file = &args[2];
+    //let k: usize = args[3].parse().expect("k must be a valid usize");
+    let mut counter = 0;
+
+    for file in fs::read_dir("~/Testgraphen/random_planar_graphs/10M/").expect("no such file or directory") {
+        let file_name = file.unwrap().file_name();
+
+        let file = File::open(format!("~/Testgraphen/random_planar_graphs/10M/{}", file_name.to_str().unwrap()))?;
+        let mut reader = io::BufReader::new(file);
+
+        // Open output file for writing
+        let output = File::create(format!("./augmented_testgraphs/{}/{}", 10 + counter / 10, file_name.to_str().unwrap()))?;
+        let mut writer = BufWriter::new(output);
+
+        let gf = GraphFile::read(&mut reader)?;
+        let n = gf.n;
+        let sqrt = (n as f64).sqrt() as usize;
+
+        if counter < 10 {
+            gf.augment(n).write(&mut writer)?;
+        } else if counter < 20 {
+            gf.augment(sqrt).write(&mut writer)?;
+        } else  {
+            break;
+        }
+
+        counter += 1
+    }
 
     // Open input file for reading
-    let file = File::open(input_file)?;
-    let mut reader = io::BufReader::new(file);
-
-    // Open output file for writing
-    let output = File::create(output_file)?;
-    let mut writer = BufWriter::new(output);
-
-    GraphFile::read(&mut reader)?.augment(k).write(&mut writer)?;
+    
 
     Ok(())
 }
