@@ -1,6 +1,7 @@
 use rand::{seq::SliceRandom, thread_rng};
+use std::fmt::format;
 use std::fs::{self, File};
-use std::io::{self, BufRead, Write, BufWriter};
+use std::io::{self, BufRead, BufWriter, Write};
 
 struct GraphFile {
     lines: Vec<String>,
@@ -35,7 +36,7 @@ impl GraphFile {
                             }
                         }
                         first += 1;
-                    } else if  first == 1 {
+                    } else if first == 1 {
                         match elements[0].parse::<usize>() {
                             Ok(val) => {
                                 m = val;
@@ -55,6 +56,34 @@ impl GraphFile {
             }
         }
         Ok(GraphFile { lines, n, m })
+    }
+
+    fn augment_deg_two(mut self, k: usize, sorted: bool) -> Self {
+        let mut edges: Vec<(usize, usize)> = self
+            .lines
+            .iter()
+            .map(|line| line.split(' ').collect::<Vec<&str>>())
+            .map(|line| {
+                (
+                    line[0].parse::<usize>().unwrap(),
+                    line[1].parse::<usize>().unwrap(),
+                )
+            })
+            .collect();
+        edges.shuffle(&mut thread_rng());
+        for i in 0..k {
+            let x = self.n + 1 + i;
+            let u = edges[i].0;
+            let v = edges[i].1;
+            edges[i] = (u, x);
+            edges.push((v, x));
+        }
+        if sorted {
+            edges.sort()
+        };
+        let mut lines = vec![self.lines[0].clone()];
+        lines.extend(edges.iter().map(|(u, v)| format!("{} {}", u, v)));
+        self
     }
 
     fn augment(mut self, k: usize) -> Self {
@@ -91,14 +120,23 @@ fn main() -> Result<(), std::io::Error> {
     //let k: usize = args[3].parse().expect("k must be a valid usize");
     let mut counter = 0;
 
-    for file in fs::read_dir("~/Testgraphen/random_planar_graphs/10M/").expect("no such file or directory") {
+    for file in
+        fs::read_dir("~/Testgraphen/random_planar_graphs/10M/").expect("no such file or directory")
+    {
         let file_name = file.unwrap().file_name();
 
-        let file = File::open(format!("~/Testgraphen/random_planar_graphs/10M/{}", file_name.to_str().unwrap()))?;
+        let file = File::open(format!(
+            "~/Testgraphen/random_planar_graphs/10M/{}",
+            file_name.to_str().unwrap()
+        ))?;
         let mut reader = io::BufReader::new(file);
 
         // Open output file for writing
-        let output = File::create(format!("./augmented_testgraphs/{}/{}", 10 + counter / 10, file_name.to_str().unwrap()))?;
+        let output = File::create(format!(
+            "./augmented_testgraphs/{}/{}",
+            10 + counter / 10,
+            file_name.to_str().unwrap()
+        ))?;
         let mut writer = BufWriter::new(output);
 
         let gf = GraphFile::read(&mut reader)?;
@@ -109,7 +147,7 @@ fn main() -> Result<(), std::io::Error> {
             gf.augment(n).write(&mut writer)?;
         } else if counter < 20 {
             gf.augment(sqrt).write(&mut writer)?;
-        } else  {
+        } else {
             break;
         }
 
@@ -117,7 +155,6 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     // Open input file for reading
-    
 
     Ok(())
 }
